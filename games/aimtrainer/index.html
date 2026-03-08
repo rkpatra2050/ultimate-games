@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>🎯 Aim Trainer</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    #arena{position:relative;margin:0 auto;max-width:500px;width:min(94vw,500px);aspect-ratio:1;background:#0d1b2a;border:2px solid #1a1a3e;border-radius:12px;overflow:hidden;cursor:crosshair;touch-action:none;}
+    @media(max-width:600px){#arena{width:98vw;max-width:98vw;}}
+    .target{position:absolute;border-radius:50%;pointer-events:none;transition:transform .1s;}
+    .ring{position:absolute;border-radius:50%;border:3px solid;}
+    .timer-bar{width:100%;height:6px;background:#1a1a3e;border-radius:3px;margin:8px auto;max-width:500px;}
+    .timer-fill{height:100%;background:linear-gradient(90deg,#ff4757,#feca57,#00f260);border-radius:3px;transition:width .1s linear;}
+    .msg{text-align:center;font-size:clamp(1rem,4vw,1.3rem);min-height:30px;color:#feca57;margin-top:8px;}
+    .btn{display:block;margin:12px auto;padding:14px 36px;font-size:1.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#ff4757,#ee5a24);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(.95);}
+    .stats{display:flex;justify-content:center;gap:16px;font-size:.85rem;color:#888;margin-top:6px;flex-wrap:wrap;}
+    .stats strong{color:#feca57;}
+    .hit-fx{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.6),transparent);pointer-events:none;animation:hitPop .3s ease-out forwards;}
+    @keyframes hitPop{0%{transform:scale(0);opacity:1;}100%{transform:scale(3);opacity:0;}}
+    .score-pop{position:absolute;font-weight:800;color:#00f260;font-size:1.2rem;pointer-events:none;animation:sPop .6s ease-out forwards;}
+    @keyframes sPop{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-40px);}}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🎯 Aim Trainer</h1>
+    <div class="score-board">
+      <span>Score: <strong id="sc">0</strong></span>
+      <span>Best: <strong id="hi">0</strong></span>
+    </div>
+  </div>
+  <div class="timer-bar"><div class="timer-fill" id="tf" style="width:100%"></div></div>
+  <div id="arena"></div>
+  <div class="msg" id="msg"></div>
+  <div class="stats">
+    <span>Hits: <strong id="hits">0</strong></span>
+    <span>Misses: <strong id="miss">0</strong></span>
+    <span>Accuracy: <strong id="acc">0%</strong></span>
+  </div>
+  <button class="btn" id="startBtn">▶ START</button>
+<script>
+const arena=document.getElementById('arena'),scE=document.getElementById('sc'),hiE=document.getElementById('hi');
+const tfE=document.getElementById('tf'),msgE=document.getElementById('msg');
+const hitsE=document.getElementById('hits'),missE=document.getElementById('miss'),accE=document.getElementById('acc');
+let best=+localStorage.getItem('at_hi')||0;hiE.textContent=best;
+let sc,hits,misses,run=false,timer,maxTime=30,tLeft,tgt=null,tgtX,tgtY,tgtR,shrinkI;
+
+function init(){
+  sc=0;hits=0;misses=0;tLeft=maxTime;run=true;
+  scE.textContent=0;hitsE.textContent=0;missE.textContent=0;accE.textContent='0%';
+  tfE.style.width='100%';msgE.textContent='';
+  spawnTarget();
+  timer=setInterval(()=>{
+    tLeft-=0.1;tfE.style.width=(tLeft/maxTime*100)+'%';
+    if(tLeft<=0)endGame();
+  },100);
+}
+
+function spawnTarget(){
+  if(tgt)tgt.remove();
+  const r=20+Math.random()*25;tgtR=r;
+  const aw=arena.clientWidth,ah=arena.clientHeight;
+  tgtX=r+Math.random()*(aw-r*2);tgtY=r+Math.random()*(ah-r*2);
+  const d=document.createElement('div');d.className='target';
+  d.style.cssText=`left:${tgtX-r}px;top:${tgtY-r}px;width:${r*2}px;height:${r*2}px;background:radial-gradient(circle,#ff4757 30%,#ff6b6b 60%,transparent 70%);`;
+  // rings
+  const r1=document.createElement('div');r1.className='ring';r1.style.cssText=`inset:15%;border-color:rgba(255,255,255,.3);`;
+  const r2=document.createElement('div');r2.className='ring';r2.style.cssText=`inset:40%;border-color:rgba(255,255,255,.5);`;
+  const dot=document.createElement('div');dot.style.cssText=`position:absolute;inset:42%;border-radius:50%;background:#fff;`;
+  d.append(r1,r2,dot);arena.appendChild(d);tgt=d;
+}
+
+function hitFx(x,y,pts){
+  const h=document.createElement('div');h.className='hit-fx';h.style.cssText=`left:${x-15}px;top:${y-15}px;width:30px;height:30px;`;
+  arena.appendChild(h);setTimeout(()=>h.remove(),300);
+  const s=document.createElement('div');s.className='score-pop';s.textContent='+'+pts;s.style.cssText=`left:${x}px;top:${y-10}px;`;
+  arena.appendChild(s);setTimeout(()=>s.remove(),600);
+}
+
+arena.addEventListener('pointerdown',e=>{
+  if(!run)return;
+  const rect=arena.getBoundingClientRect();
+  const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
+  const dist=Math.sqrt((cx-tgtX)**2+(cy-tgtY)**2);
+  if(dist<=tgtR){
+    const pts=Math.round((1-dist/tgtR)*50)+10;
+    sc+=pts;hits++;scE.textContent=sc;hitsE.textContent=hits;hitFx(cx,cy,pts);
+    spawnTarget();
+  }else{
+    misses++;missE.textContent=misses;
+  }
+  const total=hits+misses;accE.textContent=total?Math.round(hits/total*100)+'%':'0%';
+});
+
+function endGame(){
+  clearInterval(timer);run=false;
+  if(sc>best){best=sc;hiE.textContent=best;localStorage.setItem('at_hi',best);}
+  msgE.textContent=sc>=best&&sc>0?`🏆 New Best! ${sc} points!`:`Time's up! Score: ${sc}`;
+  if(tgt){tgt.remove();tgt=null;}
+}
+
+document.getElementById('startBtn').onclick=()=>{if(!run)init();};
+</script>
+</body>
+</html>

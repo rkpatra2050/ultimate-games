@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>🧮 Math Sprint</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    .game-box{max-width:380px;width:min(92vw,380px);margin:16px auto;padding:clamp(16px,4vw,30px);background:linear-gradient(145deg,#1a1a3e,#12122a);border:2px solid #2a2a5a;border-radius:20px;}
+    @media(max-width:600px){.game-box{width:96vw;max-width:96vw;}}
+    .timer-bar{height:10px;border-radius:5px;background:#333;margin:10px 0;overflow:hidden;}
+    .timer-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,#00f260,#0575e6);transition:width .1s linear;}
+    .timer-fill.low{background:linear-gradient(90deg,#ef4444,#f59e0b);}
+    .question{text-align:center;font-size:clamp(2rem,7vw,3rem);font-weight:800;color:#feca57;margin:20px 0;min-height:60px;}
+    .answers{display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,2vw,14px);margin-top:16px;}
+    .ans-btn{padding:clamp(14px,4vw,22px);font-size:clamp(1.2rem,4vw,1.6rem);font-weight:700;border:none;border-radius:14px;cursor:pointer;background:#1e293b;color:#fff;border:2px solid #334155;-webkit-tap-highlight-color:transparent;transition:all .15s;}
+    .ans-btn:active{transform:scale(.95);}
+    .ans-btn.correct{background:#10b981;border-color:#10b981;}
+    .ans-btn.wrong{background:#ef4444;border-color:#ef4444;}
+    .stats{display:flex;justify-content:space-between;font-size:clamp(1rem,3.5vw,1.3rem);color:#aaa;margin-bottom:10px;}
+    .stats .sc{color:#feca57;font-weight:700;}
+    .combo{text-align:center;font-size:clamp(.9rem,3vw,1.1rem);color:#10b981;min-height:24px;margin-top:8px;}
+    .start-screen,.end-screen{text-align:center;padding:30px 0;}
+    .start-screen h2{color:#feca57;font-size:clamp(1.5rem,5vw,2rem);}
+    .start-btn,.restart-btn{padding:clamp(14px,4vw,20px) clamp(30px,8vw,50px);font-size:clamp(1.1rem,3.5vw,1.4rem);font-weight:700;border:none;border-radius:14px;cursor:pointer;background:linear-gradient(135deg,#00f260,#0575e6);color:#fff;margin-top:16px;-webkit-tap-highlight-color:transparent;}
+    .start-btn:active,.restart-btn:active{transform:scale(.95);}
+    .final-score{font-size:clamp(2rem,7vw,3rem);color:#feca57;font-weight:800;margin:16px 0;}
+    .hidden{display:none!important;}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header"><h1>🧮 Math Sprint</h1></div>
+  <div class="game-box">
+    <div id="startScreen" class="start-screen">
+      <h2>⚡ Speed Math!</h2>
+      <p style="color:#888;margin:10px 0;">Solve as many as you can in 60 seconds</p>
+      <button class="start-btn" id="startBtn">START</button>
+    </div>
+    <div id="gameArea" class="hidden">
+      <div class="stats">
+        <span>⏱ <span id="time">60</span>s</span>
+        <span class="sc">🔥 <span id="score">0</span></span>
+      </div>
+      <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+      <div class="question" id="question">?</div>
+      <div class="answers" id="answers"></div>
+      <div class="combo" id="combo"></div>
+    </div>
+    <div id="endScreen" class="end-screen hidden">
+      <h2>🏁 Time's Up!</h2>
+      <div class="final-score" id="finalScore">0</div>
+      <p style="color:#888;">Correct: <span id="correct">0</span> | Wrong: <span id="wrong">0</span></p>
+      <p style="color:#888;">Best Combo: <span id="bestCombo">0</span>x</p>
+      <p style="color:#666;margin-top:8px;">Best: <span id="best">0</span></p>
+      <button class="restart-btn" id="restartBtn">PLAY AGAIN</button>
+    </div>
+  </div>
+<script>
+const qE=document.getElementById('question'),ansE=document.getElementById('answers'),
+  timeE=document.getElementById('time'),scoreE=document.getElementById('score'),
+  comboE=document.getElementById('combo'),timerFill=document.getElementById('timerFill'),
+  startScreen=document.getElementById('startScreen'),gameArea=document.getElementById('gameArea'),
+  endScreen=document.getElementById('endScreen');
+
+let score=0,timeLeft=60,timer=null,combo=0,bestCombo=0,correctN=0,wrongN=0,
+  hi=+localStorage.getItem('ms_hi')||0,difficulty=1;
+
+function randInt(a,b){return a+Math.floor(Math.random()*(b-a+1));}
+
+function genQuestion(){
+  const ops=['+','-','×'];
+  let a,b,op,ans;
+  if(difficulty<5){
+    a=randInt(1,20);b=randInt(1,20);op=ops[randInt(0,1)];
+  }else if(difficulty<15){
+    a=randInt(2,50);b=randInt(2,50);op=ops[randInt(0,2)];
+  }else{
+    a=randInt(5,99);b=randInt(2,30);op=ops[randInt(0,2)];
+  }
+  if(op==='+')ans=a+b;
+  else if(op==='-'){if(a<b)[a,b]=[b,a];ans=a-b;}
+  else{a=randInt(2,12);b=randInt(2,12);ans=a*b;}
+  // generate wrong answers
+  const wrongs=new Set();
+  while(wrongs.size<3){
+    let w=ans+randInt(-10,10);
+    if(w!==ans&&w>=0)wrongs.add(w);
+  }
+  const choices=[ans,...wrongs];
+  // shuffle
+  for(let i=choices.length-1;i>0;i--){const j=randInt(0,i);[choices[i],choices[j]]=[choices[j],choices[i]];}
+  return{text:`${a} ${op} ${b}`,ans:ans,choices:choices};
+}
+
+function showQuestion(){
+  const q=genQuestion();
+  qE.textContent=q.text;
+  ansE.innerHTML='';
+  q.choices.forEach(ch=>{
+    const btn=document.createElement('button');
+    btn.className='ans-btn';btn.textContent=ch;
+    btn.onclick=()=>answer(ch,q.ans,btn);
+    ansE.appendChild(btn);
+  });
+}
+
+function answer(chosen,correct,btn){
+  const btns=ansE.querySelectorAll('.ans-btn');
+  btns.forEach(b=>b.onclick=null);
+  if(chosen===correct){
+    btn.classList.add('correct');
+    score+=10+combo*2;combo++;correctN++;
+    if(combo>bestCombo)bestCombo=combo;
+    comboE.textContent=combo>1?`🔥 ${combo}x Combo!`:'';
+    difficulty++;
+  }else{
+    btn.classList.add('wrong');
+    btns.forEach(b=>{if(+b.textContent===correct)b.classList.add('correct');});
+    combo=0;wrongN++;comboE.textContent='';
+    if(difficulty>1)difficulty--;
+  }
+  scoreE.textContent=score;
+  setTimeout(showQuestion,400);
+}
+
+function tick(){
+  timeLeft--;timeE.textContent=timeLeft;
+  const pct=timeLeft/60*100;
+  timerFill.style.width=pct+'%';
+  timerFill.classList.toggle('low',timeLeft<15);
+  if(timeLeft<=0){clearInterval(timer);endGame();}
+}
+
+function startGame(){
+  score=0;timeLeft=60;combo=0;bestCombo=0;correctN=0;wrongN=0;difficulty=1;
+  scoreE.textContent=0;timeE.textContent=60;comboE.textContent='';
+  timerFill.style.width='100%';timerFill.classList.remove('low');
+  startScreen.classList.add('hidden');endScreen.classList.add('hidden');
+  gameArea.classList.remove('hidden');
+  showQuestion();
+  timer=setInterval(tick,1000);
+}
+
+function endGame(){
+  gameArea.classList.add('hidden');endScreen.classList.remove('hidden');
+  document.getElementById('finalScore').textContent=score;
+  document.getElementById('correct').textContent=correctN;
+  document.getElementById('wrong').textContent=wrongN;
+  document.getElementById('bestCombo').textContent=bestCombo;
+  if(score>hi){hi=score;localStorage.setItem('ms_hi',hi);}
+  document.getElementById('best').textContent=hi;
+}
+
+document.getElementById('startBtn').onclick=startGame;
+document.getElementById('restartBtn').onclick=startGame;
+</script>
+</body>
+</html>

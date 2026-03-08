@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>🏀 Basketball</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    #wrap{position:relative;margin:0 auto;max-width:400px;width:min(92vw,400px);aspect-ratio:3/4;touch-action:none;}
+    canvas{width:100%;height:100%;}
+    @media(max-width:600px){#wrap{width:98vw;max-width:98vw;}}
+    #ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(10,10,26,.9);border-radius:10px;z-index:10;transition:opacity .3s;gap:12px;padding:20px;}
+    #ov.hidden{opacity:0;pointer-events:none;}
+    #ov h2{font-size:clamp(1.5rem,5vw,2.2rem);}
+    .fin{font-size:clamp(2rem,8vw,3rem);font-weight:900;color:#ff9f43;text-shadow:0 0 20px rgba(255,159,67,.5);}
+    .sub{color:#888;font-size:.95rem;}
+    .btn{padding:14px 36px;font-size:1.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#ff9f43,#ee5a24);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(.95);}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🏀 Basketball</h1>
+    <div class="score-board">
+      <span>Score: <strong id="sc">0</strong></span>
+      <span>Streak: <strong id="st">0</strong></span>
+      <span>Best: <strong id="hi">0</strong></span>
+    </div>
+  </div>
+  <div id="wrap">
+    <canvas id="c"></canvas>
+    <div id="ov">
+      <h2>🏀 Basketball</h2>
+      <p class="sub">Swipe up to shoot!</p>
+      <button class="btn" id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+<script>
+const cv=document.getElementById('c'),X=cv.getContext('2d');
+const W=400,H=533;cv.width=W;cv.height=H;
+const scE=document.getElementById('sc'),stE=document.getElementById('st'),hiE=document.getElementById('hi'),ov=document.getElementById('ov');
+let best=+localStorage.getItem('bb_hi')||0;hiE.textContent=best;
+
+const G=0.35,HOOP_X=W/2,HOOP_Y=130,HOOP_R=30,BALL_R=16;
+let bx,by,bvx,bvy,sc,streak,run=false,shooting=false,scored=false,missTimer,fr=0;
+
+function init(){
+  bx=W/2;by=H-100;bvx=0;bvy=0;sc=0;streak=0;shooting=false;scored=false;run=true;fr=0;
+  scE.textContent=0;stE.textContent=0;ov.classList.add('hidden');
+}
+
+function shoot(vx,vy){
+  if(shooting)return;
+  shooting=true;scored=false;bvx=vx;bvy=vy;
+  clearTimeout(missTimer);
+  missTimer=setTimeout(()=>{if(!scored&&shooting)miss();},3000);
+}
+
+function miss(){
+  shooting=false;streak=0;stE.textContent=0;
+  bx=W/2+(Math.random()-.5)*60;by=H-100;bvx=0;bvy=0;
+}
+
+function update(){
+  fr++;
+  if(!shooting)return;
+  bvy+=G;bx+=bvx;by+=bvy;
+  // bounce walls
+  if(bx<BALL_R){bx=BALL_R;bvx*=-.5;}
+  if(bx>W-BALL_R){bx=W-BALL_R;bvx*=-.5;}
+  // check score — ball passes through hoop
+  if(!scored&&by>HOOP_Y-5&&by<HOOP_Y+10&&Math.abs(bx-HOOP_X)<HOOP_R-5&&bvy>0){
+    scored=true;sc++;streak++;scE.textContent=sc;stE.textContent=streak;
+    if(sc>best){best=sc;hiE.textContent=best;localStorage.setItem('bb_hi',best);}
+  }
+  // ball goes below screen
+  if(by>H+30){
+    if(!scored){streak=0;stE.textContent=0;}
+    shooting=false;bx=W/2+(Math.random()-.5)*60;by=H-100;bvx=0;bvy=0;
+  }
+}
+
+function draw(){
+  X.fillStyle='#0d1b2a';X.fillRect(0,0,W,H);
+  // backboard
+  X.fillStyle='#2a2a5a';X.fillRect(HOOP_X-40,HOOP_Y-60,80,55);X.strokeStyle='#48dbfb';X.lineWidth=2;X.strokeRect(HOOP_X-40,HOOP_Y-60,80,55);
+  X.strokeStyle='#fff';X.lineWidth=1;X.strokeRect(HOOP_X-18,HOOP_Y-35,36,28);
+  // hoop rim
+  X.strokeStyle='#ff4757';X.lineWidth=4;X.beginPath();X.arc(HOOP_X,HOOP_Y,HOOP_R,0,Math.PI);X.stroke();
+  // net lines
+  X.strokeStyle='rgba(255,255,255,.2)';X.lineWidth=1;
+  for(let i=-3;i<=3;i++){X.beginPath();X.moveTo(HOOP_X+i*10,HOOP_Y);X.lineTo(HOOP_X+i*6,HOOP_Y+40);X.stroke();}
+  for(let j=0;j<3;j++){const ny=HOOP_Y+10+j*12;X.beginPath();X.moveTo(HOOP_X-HOOP_R+j*5,ny);X.lineTo(HOOP_X+HOOP_R-j*5,ny);X.stroke();}
+
+  // ball
+  X.fillStyle='#ff9f43';X.shadowColor='#ff9f43';X.shadowBlur=12;
+  X.beginPath();X.arc(bx,by,BALL_R,0,Math.PI*2);X.fill();X.shadowBlur=0;
+  // ball lines
+  X.strokeStyle='rgba(0,0,0,.2)';X.lineWidth=1.5;
+  X.beginPath();X.arc(bx,by,BALL_R,0,Math.PI*2);X.stroke();
+  X.beginPath();X.moveTo(bx-BALL_R,by);X.lineTo(bx+BALL_R,by);X.stroke();
+  X.beginPath();X.arc(bx,by,BALL_R*.6,-.5,Math.PI+.5);X.stroke();
+
+  // streak display
+  if(streak>=3&&run){X.fillStyle='#feca57';X.font='bold 20px Inter,sans-serif';X.textAlign='center';X.fillText('🔥 '+streak+' streak!',W/2,H-30);}
+}
+
+function loop(){if(run)update();draw();requestAnimationFrame(loop);}
+bx=W/2;by=H-100;
+requestAnimationFrame(loop);
+document.getElementById('playBtn').onclick=init;
+
+// touch shoot
+let sy=null,sx=null;
+cv.addEventListener('touchstart',e=>{e.preventDefault();sy=e.touches[0].clientY;sx=e.touches[0].clientX;},{passive:false});
+cv.addEventListener('touchend',e=>{
+  if(!run||sy===null)return;
+  const dy=e.changedTouches[0].clientY-sy,dx=e.changedTouches[0].clientX-sx;
+  if(dy<-30){shoot(dx*0.02,dy*0.035);}
+  sy=null;sx=null;
+},{passive:true});
+// mouse
+let my=null,mx=null;
+cv.addEventListener('mousedown',e=>{my=e.clientY;mx=e.clientX;});
+cv.addEventListener('mouseup',e=>{
+  if(!run||my===null)return;
+  const dy=e.clientY-my,dx=e.clientX-mx;
+  if(dy<-30)shoot(dx*0.02,dy*0.035);
+  my=null;mx=null;
+});
+</script>
+</body>
+</html>

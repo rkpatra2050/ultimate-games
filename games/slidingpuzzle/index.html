@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>🧩 Sliding Puzzle</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    .board{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(4px,1.5vw,8px);max-width:380px;width:min(90vw,380px);margin:12px auto;padding:clamp(6px,2vw,12px);background:#1a1a3e;border-radius:14px;}
+    @media(max-width:600px){.board{width:96vw;max-width:96vw;}}
+    .tile{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:clamp(1.4rem,5vw,2.2rem);font-weight:800;border-radius:10px;background:linear-gradient(135deg,#0575e6,#48dbfb);color:#fff;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .15s,opacity .15s;text-shadow:0 2px 4px rgba(0,0,0,.3);}
+    .tile:active{transform:scale(.92);}
+    .tile.empty{background:transparent;cursor:default;pointer-events:none;}
+    .msg{text-align:center;margin-top:14px;font-size:clamp(1rem,3.5vw,1.2rem);min-height:30px;color:#00f260;}
+    .btn{display:block;margin:12px auto;padding:12px 32px;font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#0575e6,#48dbfb);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(.95);}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🧩 Sliding Puzzle</h1>
+    <div class="score-board">
+      <span>Moves: <strong id="mv">0</strong></span>
+      <span>Time: <strong id="tm">0s</strong></span>
+    </div>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="msg" id="msg"></div>
+  <button class="btn" id="restart">↻ Shuffle</button>
+<script>
+const boardE=document.getElementById('board'),mvE=document.getElementById('mv'),tmE=document.getElementById('tm'),msgE=document.getElementById('msg');
+let tiles,empty,moves,solved,timer,startTime;
+
+function isSolvable(arr){
+  let inv=0;const flat=arr.filter(v=>v!==0);
+  for(let i=0;i<flat.length;i++)for(let j=i+1;j<flat.length;j++)if(flat[i]>flat[j])inv++;
+  const eRow=Math.floor(arr.indexOf(0)/4);
+  return(inv+(4-eRow))%2===0;
+}
+
+function init(){
+  clearInterval(timer);
+  do{tiles=[...Array(16).keys()];for(let i=15;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tiles[i],tiles[j]]=[tiles[j],tiles[i]];}}while(!isSolvable(tiles)||isWin(tiles));
+  empty=tiles.indexOf(0);moves=0;solved=false;
+  mvE.textContent=0;tmE.textContent='0s';msgE.textContent='';
+  startTime=Date.now();timer=setInterval(()=>{if(!solved)tmE.textContent=Math.floor((Date.now()-startTime)/1000)+'s';},500);
+  render();
+}
+
+function isWin(t){for(let i=0;i<15;i++)if(t[i]!==i+1)return false;return true;}
+
+function render(){
+  boardE.innerHTML='';
+  tiles.forEach((v,i)=>{
+    const d=document.createElement('div');
+    d.className='tile'+(v===0?' empty':'');
+    d.textContent=v||'';
+    if(v)d.addEventListener('click',()=>move(i));
+    boardE.appendChild(d);
+  });
+}
+
+function move(i){
+  if(solved)return;
+  const r=Math.floor(i/4),c=i%4,er=Math.floor(empty/4),ec=empty%4;
+  if((Math.abs(r-er)+Math.abs(c-ec))!==1)return;
+  [tiles[i],tiles[empty]]=[tiles[empty],tiles[i]];
+  empty=i;moves++;mvE.textContent=moves;render();
+  if(isWin(tiles)){solved=true;clearInterval(timer);const t=Math.floor((Date.now()-startTime)/1000);msgE.textContent=`🎉 Solved in ${moves} moves, ${t}s!`;}
+}
+
+document.getElementById('restart').onclick=init;
+init();
+</script>
+</body>
+</html>

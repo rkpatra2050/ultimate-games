@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>🏎️ Car Racing</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    #wrap{position:relative;margin:0 auto;max-width:360px;width:min(90vw,360px);aspect-ratio:9/16;touch-action:none;}
+    canvas{width:100%;height:100%;}
+    @media(max-width:600px){#wrap{width:98vw;max-width:98vw;}}
+    #ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(10,10,26,.9);border-radius:10px;z-index:10;transition:opacity .3s;gap:12px;padding:20px;}
+    #ov.hidden{opacity:0;pointer-events:none;}
+    #ov h2{font-size:clamp(1.5rem,5vw,2.2rem);}
+    .fin{font-size:clamp(2rem,8vw,3rem);font-weight:900;color:#ff4757;text-shadow:0 0 20px rgba(255,71,87,.5);}
+    .sub{color:#888;font-size:.95rem;}
+    .btn{padding:14px 36px;font-size:1.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#ff4757,#ee5a24);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(.95);}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🏎️ Car Racing</h1>
+    <div class="score-board">
+      <span>Score: <strong id="sc">0</strong></span>
+      <span>Speed: <strong id="sp">1</strong></span>
+      <span>Best: <strong id="hi">0</strong></span>
+    </div>
+  </div>
+  <div id="wrap">
+    <canvas id="c"></canvas>
+    <div id="ov">
+      <h2>🏎️ Car Racing</h2>
+      <p class="sub">Dodge traffic! Tilt or touch to steer.</p>
+      <button class="btn" id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+<script>
+const cv=document.getElementById('c'),X=cv.getContext('2d');
+const W=360,H=640;cv.width=W;cv.height=H;
+const scE=document.getElementById('sc'),spE=document.getElementById('sp'),hiE=document.getElementById('hi'),ov=document.getElementById('ov');
+let best=+localStorage.getItem('cr_hi')||0;hiE.textContent=best;
+
+const LANES=[72,144,216,288];
+const CAR_W=44,CAR_H=80;
+let px,lane,cars,sc,spd,fr,run=false,go=false,roadOff=0;
+
+const COLS=['#ff4757','#feca57','#48dbfb','#00f260','#a29bfe','#f368e0','#ff9f43'];
+
+function init(){
+  lane=1;px=LANES[lane]-CAR_W/2;cars=[];sc=0;spd=3;fr=0;run=true;go=false;
+  scE.textContent=0;spE.textContent=1;ov.classList.add('hidden');
+}
+
+function addCar(){
+  const l=Math.floor(Math.random()*4);
+  cars.push({x:LANES[l]-CAR_W/2,y:-CAR_H-Math.random()*100,col:COLS[Math.floor(Math.random()*COLS.length)],w:CAR_W,h:CAR_H});
+}
+
+function update(){
+  fr++;roadOff=(roadOff+spd)%40;
+  if(fr%Math.max(15,40-Math.floor(sc/20))===0)addCar();
+  spd=3+sc/50;spE.textContent=Math.floor(spd);
+
+  for(let c of cars)c.y+=spd;
+  cars=cars.filter(c=>{
+    if(c.y>H){sc++;scE.textContent=sc;return false;}return true;
+  });
+
+  // collision
+  for(let c of cars){
+    if(px<c.x+c.w&&px+CAR_W>c.x&&H-120<c.y+c.h&&H-120+CAR_H>c.y)return die();
+  }
+}
+
+function die(){
+  run=false;go=true;
+  if(sc>best){best=sc;hiE.textContent=best;localStorage.setItem('cr_hi',best);}
+  ov.innerHTML=`<h2>💥 Crashed!</h2><div class="fin">${sc}</div><p class="sub">${sc>=best&&sc>0?'🏆 New Best!':'Score'}</p><button class="btn" id="rb">↻ AGAIN</button>`;
+  ov.classList.remove('hidden');document.getElementById('rb').onclick=init;
+}
+
+function draw(){
+  // Road
+  X.fillStyle='#2d2d2d';X.fillRect(0,0,W,H);
+  // Grass
+  X.fillStyle='#1a5c1a';X.fillRect(0,0,36,H);X.fillRect(W-36,0,36,H);
+  // Lane lines
+  X.strokeStyle='#feca57';X.lineWidth=3;X.setLineDash([30,20]);X.lineDashOffset=-roadOff*2;
+  for(let i=1;i<4;i++){X.beginPath();X.moveTo(LANES[i]-36,0);X.lineTo(LANES[i]-36,H);X.stroke();}
+  X.setLineDash([]);
+  // Center line
+  X.strokeStyle='#fff';X.lineWidth=2;X.setLineDash([20,15]);X.lineDashOffset=-roadOff*2;
+  X.beginPath();X.moveTo(W/2,0);X.lineTo(W/2,H);X.stroke();X.setLineDash([]);
+
+  // enemy cars
+  for(let c of cars){
+    X.fillStyle=c.col;X.shadowColor=c.col;X.shadowBlur=8;
+    // body
+    X.beginPath();
+    X.roundRect(c.x,c.y,c.w,c.h,8);X.fill();
+    // windshield
+    X.fillStyle='rgba(0,0,0,.4)';
+    X.fillRect(c.x+6,c.y+10,c.w-12,18);
+    // rear window
+    X.fillRect(c.x+8,c.y+c.h-24,c.w-16,14);
+    X.shadowBlur=0;
+  }
+
+  // player car
+  const py=H-120;
+  X.fillStyle='#48dbfb';X.shadowColor='#48dbfb';X.shadowBlur=12;
+  X.beginPath();X.roundRect(px,py,CAR_W,CAR_H,8);X.fill();
+  X.fillStyle='rgba(0,0,0,.3)';X.fillRect(px+6,py+8,CAR_W-12,16);
+  X.fillRect(px+8,py+CAR_H-22,CAR_W-16,12);
+  // tail lights
+  X.fillStyle='#ff4757';X.shadowColor='#ff4757';X.shadowBlur=6;
+  X.fillRect(px+2,py+CAR_H-6,8,4);X.fillRect(px+CAR_W-10,py+CAR_H-6,8,4);
+  // headlights
+  X.fillStyle='#feca57';X.shadowColor='#feca57';
+  X.fillRect(px+4,py-2,8,4);X.fillRect(px+CAR_W-12,py-2,8,4);
+  X.shadowBlur=0;
+
+  if(go){X.fillStyle='rgba(255,0,0,.15)';X.fillRect(0,0,W,H);}
+}
+
+function loop(){if(run)update();draw();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+document.getElementById('playBtn').onclick=init;
+
+// keyboard
+document.addEventListener('keydown',e=>{
+  if(!run)return;
+  if(e.key==='ArrowLeft'||e.key==='a'){lane=Math.max(0,lane-1);px=LANES[lane]-CAR_W/2;e.preventDefault();}
+  if(e.key==='ArrowRight'||e.key==='d'){lane=Math.min(3,lane+1);px=LANES[lane]-CAR_W/2;e.preventDefault();}
+});
+
+// touch — slide left/right
+let tx=null;
+cv.addEventListener('touchstart',e=>{e.preventDefault();tx=e.touches[0].clientX;},{passive:false});
+cv.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(tx===null)return;
+  const dx=e.touches[0].clientX-tx;
+  if(Math.abs(dx)>30){
+    if(dx>0)lane=Math.min(3,lane+1);else lane=Math.max(0,lane-1);
+    px=LANES[lane]-CAR_W/2;tx=e.touches[0].clientX;
+  }
+},{passive:false});
+cv.addEventListener('touchend',()=>{tx=null;});
+
+// tilt
+if(window.DeviceOrientationEvent){
+  window.addEventListener('deviceorientation',e=>{
+    if(!run||e.gamma===null)return;
+    const g=e.gamma;
+    if(g<-15)lane=0;else if(g<-5)lane=1;else if(g<5)lane=Math.min(2,Math.max(1,lane));else if(g<15)lane=2;else lane=3;
+    px=LANES[lane]-CAR_W/2;
+  });
+}
+</script>
+</body>
+</html>

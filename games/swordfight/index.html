@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>⚔️ Sword Fight</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    canvas{display:block;margin:8px auto;border-radius:12px;background:#1a1a2e;max-width:96vw;}
+    @media(max-width:600px){canvas{width:96vw!important;height:auto!important;}}
+    .ctrls{display:none;justify-content:center;gap:clamp(8px,2vw,16px);margin-top:8px;flex-wrap:wrap;}
+    @media(max-width:600px){.ctrls{display:flex;}}
+    .ctrls button{padding:clamp(12px,3vw,18px) clamp(18px,4vw,28px);font-size:clamp(1rem,3.5vw,1.3rem);font-weight:700;border:none;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .ctrls button:active{transform:scale(.92);}
+    .btn-l{background:#3b82f6;color:#fff;} .btn-r{background:#3b82f6;color:#fff;}
+    .btn-atk{background:#ef4444;color:#fff;} .btn-blk{background:#10b981;color:#fff;}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header"><h1>⚔️ Sword Fight</h1></div>
+  <canvas id="c" width="400" height="400"></canvas>
+  <div class="ctrls">
+    <button class="btn-l" id="bL">◀</button>
+    <button class="btn-atk" id="bA">⚔ ATK</button>
+    <button class="btn-blk" id="bB">🛡 BLK</button>
+    <button class="btn-r" id="bR">▶</button>
+  </div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+let W=400,H=400;
+const P={x:80,y:280,w:40,h:60,hp:100,atk:false,blk:false,atkT:0,blkT:0,dir:1,col:'#3b82f6',swordCol:'#94a3b8'};
+const E={x:280,y:280,w:40,h:60,hp:100,atk:false,blk:false,atkT:0,blkT:0,dir:-1,col:'#ef4444',swordCol:'#fca5a5'};
+let keys={},gOver=false,result='';
+
+function resize(){
+  const r=Math.min(window.innerWidth*.96,400)/400;
+  c.style.width=400*r+'px';c.style.height=400*r+'px';
+}
+resize();window.addEventListener('resize',resize);
+
+function drawFighter(f,label){
+  ctx.fillStyle=f.col;
+  ctx.fillRect(f.x,f.y,f.w,f.h);
+  // head
+  ctx.beginPath();ctx.arc(f.x+f.w/2,f.y-12,14,0,Math.PI*2);ctx.fill();
+  // sword
+  const sx=f.dir===1?f.x+f.w:f.x;
+  const sAngle=f.atk?-0.3:0.8;
+  const sLen=f.atk?55:35;
+  ctx.strokeStyle=f.swordCol;ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(sx,f.y+10);
+  ctx.lineTo(sx+f.dir*sLen*Math.cos(sAngle),f.y+10-sLen*Math.sin(sAngle));
+  ctx.stroke();
+  // shield if blocking
+  if(f.blk){
+    ctx.fillStyle='rgba(16,185,129,.4)';
+    ctx.fillRect(f.dir===1?f.x+f.w:f.x-12,f.y-5,12,f.h+10);
+    ctx.strokeStyle='#10b981';ctx.lineWidth=2;
+    ctx.strokeRect(f.dir===1?f.x+f.w:f.x-12,f.y-5,12,f.h+10);
+  }
+  // HP bar
+  ctx.fillStyle='#333';ctx.fillRect(f.x-10,f.y-35,f.w+20,8);
+  ctx.fillStyle=f.hp>50?'#10b981':f.hp>25?'#f59e0b':'#ef4444';
+  ctx.fillRect(f.x-10,f.y-35,(f.w+20)*(f.hp/100),8);
+  ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.fillText(label,f.x+f.w/2,f.y-42);
+}
+
+function hitsword(attacker,defender){
+  const reach=55;
+  if(attacker.dir===1)return attacker.x+attacker.w+reach>defender.x&&attacker.x<defender.x+defender.w;
+  return attacker.x-reach<defender.x+defender.w&&attacker.x+attacker.w>defender.x;
+}
+
+function attack(attacker,defender){
+  if(attacker.atk)return;
+  attacker.atk=true;attacker.atkT=15;
+  if(hitsword(attacker,defender)){
+    if(defender.blk){/* blocked */}
+    else{defender.hp=Math.max(0,defender.hp-12);}
+  }
+}
+
+// AI for enemy
+let aiTimer=0;
+function aiUpdate(){
+  aiTimer++;
+  const dist=Math.abs(E.x-P.x);
+  // move toward player
+  if(dist>90)E.x+=E.dir*1.5;
+  else if(dist<50)E.x-=E.dir*1;
+  // attack
+  if(dist<100&&aiTimer%40<2&&Math.random()<.4)attack(E,P);
+  // block sometimes
+  E.blk=dist<80&&P.atk&&Math.random()<.5;
+  E.dir=P.x>E.x?1:-1;
+}
+
+function update(){
+  if(gOver)return;
+  // player movement
+  if(keys['ArrowLeft']||keys['left'])P.x=Math.max(0,P.x-3);
+  if(keys['ArrowRight']||keys['right'])P.x=Math.min(W-P.w,P.x+3);
+  P.blk=!!keys['block'];
+  P.dir=E.x>P.x?1:-1;
+  // attack timers
+  if(P.atkT>0){P.atkT--;if(P.atkT===0)P.atk=false;}
+  if(E.atkT>0){E.atkT--;if(E.atkT===0)E.atk=false;}
+  aiUpdate();
+  // check death
+  if(P.hp<=0){gOver=true;result='Enemy Wins!';}
+  if(E.hp<=0){gOver=true;result='You Win! 🎉';}
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // floor
+  ctx.fillStyle='#16213e';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#1a1a3e';ctx.fillRect(0,340,W,60);
+  // fighters
+  drawFighter(P,'YOU');drawFighter(E,'ENEMY');
+  if(gOver){
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#feca57';ctx.font='bold 32px sans-serif';ctx.textAlign='center';
+    ctx.fillText(result,W/2,H/2-10);
+    ctx.fillStyle='#aaa';ctx.font='16px sans-serif';
+    ctx.fillText('Tap or press R to restart',W/2,H/2+25);
+  }
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+
+document.addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  if(e.key===' '){e.preventDefault();attack(P,E);}
+  if(e.key==='r'&&gOver)restart();
+});
+document.addEventListener('keyup',e=>keys[e.key]=false);
+
+// mobile
+document.getElementById('bL').addEventListener('touchstart',e=>{e.preventDefault();keys['left']=true;});
+document.getElementById('bL').addEventListener('touchend',()=>keys['left']=false);
+document.getElementById('bR').addEventListener('touchstart',e=>{e.preventDefault();keys['right']=true;});
+document.getElementById('bR').addEventListener('touchend',()=>keys['right']=false);
+document.getElementById('bA').addEventListener('touchstart',e=>{e.preventDefault();attack(P,E);});
+document.getElementById('bB').addEventListener('touchstart',e=>{e.preventDefault();keys['block']=true;});
+document.getElementById('bB').addEventListener('touchend',()=>keys['block']=false);
+c.addEventListener('click',()=>{if(gOver)restart();});
+
+function restart(){
+  P.x=80;P.hp=100;P.atk=false;P.blk=false;P.atkT=0;P.dir=1;
+  E.x=280;E.hp=100;E.atk=false;E.blk=false;E.atkT=0;E.dir=-1;
+  gOver=false;result='';aiTimer=0;
+}
+
+loop();
+</script>
+</body>
+</html>

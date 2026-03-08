@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+  <title>🐤 Crossy Road</title>
+  <link rel="stylesheet" href="../../css/game-common.css"/>
+  <style>
+    canvas{display:block;margin:8px auto;border-radius:12px;background:#4a7c59;max-width:96vw;}
+    @media(max-width:600px){canvas{width:96vw!important;height:auto!important;}}
+    .ctrls{display:none;justify-content:center;gap:clamp(6px,2vw,10px);margin-top:8px;}
+    @media(max-width:600px){.ctrls{display:flex;}}
+    .ctrls button{width:clamp(54px,14vw,70px);height:clamp(54px,14vw,70px);font-size:clamp(1.2rem,4vw,1.6rem);font-weight:700;border:none;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#2a2a5a;color:#fff;}
+    .ctrls button:active{transform:scale(.9);background:#3b3b7a;}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header"><h1>🐤 Crossy Road</h1></div>
+  <canvas id="c" width="400" height="500"></canvas>
+  <div class="ctrls">
+    <button id="bL">◀</button>
+    <button id="bU">▲</button>
+    <button id="bD">▼</button>
+    <button id="bR">▶</button>
+  </div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const W=400,H=500,TILE=40;
+const ROWS=Math.ceil(H/TILE)+6;
+let cam=0,player={col:5,row:0,px:0,py:0,targetX:0,targetY:0,dead:false};
+let lanes=[],score=0,hi=+localStorage.getItem('cr_hi')||0,gOver=false;
+
+function resize(){const r=Math.min(window.innerWidth*.96,400)/400;c.style.width=400*r+'px';c.style.height=500*r+'px';}
+resize();window.addEventListener('resize',resize);
+
+function makeLane(i){
+  const types=['grass','road','road','water','grass','road','grass','road','water','road'];
+  const t=types[((i%types.length)+types.length)%types.length];
+  const dir=Math.random()<.5?1:-1;
+  const spd=1+Math.random()*2;
+  const obs=[];
+  if(t==='road'){
+    const n=2+Math.floor(Math.random()*3);
+    for(let j=0;j<n;j++)obs.push({x:Math.random()*W,w:30+Math.random()*40,spd:spd*dir});
+  }else if(t==='water'){
+    const n=2+Math.floor(Math.random()*2);
+    for(let j=0;j<n;j++)obs.push({x:Math.random()*W,w:50+Math.random()*30,spd:spd*dir*.6});
+  }
+  return{type:t,y:i,obs:obs,dir:dir,spd:spd};
+}
+
+function init(){
+  player={col:5,row:0,px:5*TILE,py:0,targetX:5*TILE,targetY:0,dead:false};
+  cam=0;score=0;gOver=false;
+  lanes=[];
+  for(let i=-5;i<ROWS;i++)lanes.push(makeLane(i));
+}
+
+function move(dx,dy){
+  if(gOver){init();return;}
+  if(player.dead)return;
+  const nc=player.col+dx,nr=player.row+dy;
+  if(nc<0||nc>=Math.floor(W/TILE))return;
+  player.col=nc;player.row=nr;
+  player.targetX=nc*TILE;player.targetY=-nr*TILE;
+  if(nr>score){score=nr;if(score>hi){hi=score;localStorage.setItem('cr_hi',hi);}}
+}
+
+function update(){
+  if(gOver)return;
+  // smooth move
+  player.px+=(player.targetX-player.px)*.3;
+  player.py+=(player.targetY-player.py)*.3;
+  // camera
+  const targetCam=player.row*TILE-H*.6;
+  cam+=(targetCam-cam)*.08;
+  // update obstacles
+  lanes.forEach(l=>{
+    l.obs.forEach(o=>{
+      o.x+=o.spd;
+      if(o.x>W+60)o.x=-o.w-20;
+      if(o.x<-o.w-20)o.x=W+60;
+    });
+  });
+  // collision check
+  const pRow=player.row;
+  const lane=lanes.find(l=>l.y===pRow);
+  if(lane){
+    const px=player.col*TILE;
+    if(lane.type==='road'){
+      lane.obs.forEach(o=>{
+        if(px+TILE-8>o.x&&px+8<o.x+o.w){player.dead=true;gOver=true;}
+      });
+    }
+    if(lane.type==='water'){
+      let onLog=false;
+      lane.obs.forEach(o=>{
+        if(px+TILE-8>o.x&&px+8<o.x+o.w){onLog=true;player.col+=o.spd/TILE*.5;}
+      });
+      if(!onLog&&pRow>0){player.dead=true;gOver=true;}
+    }
+  }
+  // generate more lanes
+  while(lanes[lanes.length-1].y<player.row+ROWS){
+    lanes.push(makeLane(lanes[lanes.length-1].y+1));
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.save();ctx.translate(0,cam+H*.6);
+  lanes.forEach(l=>{
+    const ly=-l.y*TILE;
+    if(ly+cam+H*.6<-TILE||ly+cam+H*.6>H+TILE)return;
+    // lane bg
+    ctx.fillStyle=l.type==='grass'?'#4a7c59':l.type==='road'?'#444':'#2980b9';
+    ctx.fillRect(0,ly,W,TILE);
+    if(l.type==='road'){ctx.strokeStyle='#555';ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(0,ly+TILE/2);ctx.lineTo(W,ly+TILE/2);ctx.stroke();ctx.setLineDash([]);}
+    // obstacles
+    l.obs.forEach(o=>{
+      if(l.type==='road'){
+        ctx.fillStyle=['#e74c3c','#3498db','#f39c12','#9b59b6'][Math.floor(o.w)%4];
+        ctx.fillRect(o.x,ly+4,o.w,TILE-8);
+        ctx.fillStyle='rgba(255,255,255,.3)';ctx.fillRect(o.x+4,ly+6,o.w*.3,4);
+      }else if(l.type==='water'){
+        ctx.fillStyle='#8B4513';ctx.fillRect(o.x,ly+6,o.w,TILE-12);
+        ctx.fillStyle='#A0522D';ctx.fillRect(o.x+3,ly+8,o.w-6,TILE-16);
+      }
+    });
+  });
+  // player
+  if(!player.dead){
+    ctx.fillStyle='#feca57';
+    ctx.fillRect(player.px+6,player.py+4,TILE-12,TILE-8);
+    ctx.fillStyle='#f39c12';
+    ctx.fillRect(player.px+10,player.py+6,TILE-20,TILE-12);
+    // beak
+    ctx.fillStyle='#e74c3c';
+    ctx.fillRect(player.px+TILE-10,player.py+TILE/2-3,8,6);
+    // eye
+    ctx.fillStyle='#111';ctx.beginPath();ctx.arc(player.px+TILE-12,player.py+12,2.5,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+  // HUD
+  ctx.fillStyle='#fff';ctx.font='bold 20px sans-serif';ctx.textAlign='left';
+  ctx.fillText('🐤 '+score,14,30);ctx.fillStyle='#888';ctx.font='14px sans-serif';ctx.fillText('Best: '+hi,14,50);
+  if(gOver){
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ef4444';ctx.font='bold 34px sans-serif';ctx.textAlign='center';
+    ctx.fillText('SPLAT!',W/2,H/2-15);
+    ctx.fillStyle='#feca57';ctx.font='20px sans-serif';ctx.fillText('Score: '+score,W/2,H/2+18);
+    ctx.fillStyle='#aaa';ctx.font='15px sans-serif';ctx.fillText('Tap to restart',W/2,H/2+48);
+  }
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowUp')move(0,1);
+  if(e.key==='ArrowDown')move(0,-1);
+  if(e.key==='ArrowLeft')move(-1,0);
+  if(e.key==='ArrowRight')move(1,0);
+});
+
+// swipe
+let sx=0,sy=0;
+c.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];sx=t.clientX;sy=t.clientY;},{passive:false});
+c.addEventListener('touchend',e=>{
+  e.preventDefault();const t=e.changedTouches[0];
+  const dx=t.clientX-sx,dy=t.clientY-sy;
+  if(Math.abs(dx)<15&&Math.abs(dy)<15){move(0,1);return;}
+  if(Math.abs(dx)>Math.abs(dy)){move(dx>0?1:-1,0);}
+  else{move(0,dy<0?1:-1);}
+},{passive:false});
+
+// dpad
+document.getElementById('bU').addEventListener('touchstart',e=>{e.preventDefault();move(0,1);});
+document.getElementById('bD').addEventListener('touchstart',e=>{e.preventDefault();move(0,-1);});
+document.getElementById('bL').addEventListener('touchstart',e=>{e.preventDefault();move(-1,0);});
+document.getElementById('bR').addEventListener('touchstart',e=>{e.preventDefault();move(1,0);});
+
+init();loop();
+</script>
+</body>
+</html>
