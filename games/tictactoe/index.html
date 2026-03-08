@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="../../css/game-common.css" />
   <style>
     .board{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(6px,2vw,8px);max-width:320px;width:min(85vw,320px);margin:16px auto;}
+    @media(max-width:600px){.board{width:92vw;max-width:92vw;}}
     .cell{aspect-ratio:1;background:#1a1a3e;border:2px solid #2a2a5a;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:clamp(2rem,9vw,4rem);font-weight:800;cursor:pointer;transition:background .2s,transform .15s,border-color .2s;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
     .cell:hover{background:#222255;}
     .cell:active{transform:scale(0.93);}

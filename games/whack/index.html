@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="../../css/game-common.css" />
   <style>
     .board{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,3vw,14px);max-width:380px;width:min(88vw,380px);margin:10px auto;}
+    @media(max-width:600px){.board{width:96vw;max-width:96vw;}}
     .hole{aspect-ratio:1;background:#1a1a3e;border:3px solid #2a2a5a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(1.6rem,7vw,3.5rem);cursor:pointer;transition:transform .1s,background .2s;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;position:relative;overflow:hidden;touch-action:manipulation;}
     .hole::after{content:'';position:absolute;bottom:0;width:100%;height:35%;background:rgba(0,0,0,.3);border-radius:0 0 50% 50%;}
     .hole.active{background:#2d1b00;border-color:#ee5a24;transform:scale(1.05);}

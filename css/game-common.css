@@ -16,6 +16,7 @@ body {
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .back-btn {
@@ -69,4 +70,11 @@ canvas {
 /* Prevent pull-to-refresh on mobile */
 @media (pointer: coarse) {
   body { overscroll-behavior: none; }
+}
+
+/* Full-width game areas on mobile */
+@media (max-width: 600px) {
+  .game-header { padding: 10px 12px 4px; }
+  .game-header h1 { font-size: clamp(1.1rem, 4.5vw, 1.6rem); }
+  .score-board { font-size: clamp(0.75rem, 2.5vw, 0.95rem); margin: 4px 0 6px; gap: 10px; }
 }

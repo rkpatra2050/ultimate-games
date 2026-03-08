@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>👾 Space Invaders</title>
+  <link rel="stylesheet" href="../../css/game-common.css" />
+  <style>
+    #wrap{position:relative;margin:0 auto;max-width:400px;width:min(92vw,400px);aspect-ratio:3/4;touch-action:none;}
+    canvas{width:100%;height:100%;}
+    @media(max-width:600px){#wrap{width:98vw;max-width:98vw;}}
+    #overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(10,10,26,.88);border-radius:10px;z-index:10;transition:opacity .3s;gap:12px;padding:20px;}
+    #overlay.hidden{opacity:0;pointer-events:none;}
+    #overlay h2{font-size:clamp(1.5rem,5vw,2.2rem);}
+    .final{font-size:clamp(2rem,8vw,3rem);font-weight:900;color:#48dbfb;text-shadow:0 0 20px rgba(72,219,251,.5);}
+    .sub{color:#888;font-size:.95rem;}
+    .btn{padding:14px 36px;font-size:1.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#48dbfb,#0575e6);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(0.95);}
+    .controls{display:none;margin:10px auto 0;gap:8px;width:fit-content;user-select:none;-webkit-user-select:none;}
+    .cb{width:clamp(56px,15vw,70px);height:clamp(56px,15vw,70px);font-size:1.5rem;background:rgba(72,219,251,.1);color:#48dbfb;border:2px solid rgba(72,219,251,.35);border-radius:16px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;}
+    .cb:active{background:rgba(72,219,251,.3);transform:scale(0.93);}
+    .crow{display:flex;gap:8px;justify-content:center;align-items:center;}
+    .cb-fire{width:clamp(120px,32vw,160px);background:rgba(255,71,87,.12);color:#ff4757;border-color:rgba(255,71,87,.4);}
+    .cb-fire:active{background:rgba(255,71,87,.35);}
+    @media(pointer:coarse){.controls{display:flex;flex-direction:column;align-items:center;}}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>👾 Space Invaders</h1>
+    <div class="score-board">
+      <span>Score: <strong id="score">0</strong></span>
+      <span>Lives: <strong id="lives">3</strong></span>
+      <span>Best: <strong id="best">0</strong></span>
+    </div>
+  </div>
+  <div id="wrap">
+    <canvas id="c" width="400" height="533"></canvas>
+    <div id="overlay">
+      <h2>👾 Space Invaders</h2>
+      <p class="sub">Destroy the alien fleet!</p>
+      <button class="btn" id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="crow">
+      <button class="cb" id="blft">◀</button>
+      <button class="cb cb-fire" id="bfire">🔥 FIRE</button>
+      <button class="cb" id="brgt">▶</button>
+    </div>
+  </div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d'),W=400,H=533;
+const sEl=document.getElementById('score'),lEl=document.getElementById('lives'),bEl=document.getElementById('best'),ov=document.getElementById('overlay');
+let hi=+localStorage.getItem('si_hi')||0;bEl.textContent=hi;
+
+// Player
+const PW=32,PH=20,PSPD=5;
+let px,bullets,enemies,eBullets,sc,lives,run=false,go=false,wave,eDir,eSpd,eDown,eTick,eShootTick,fr;
+
+function init(){
+  px=W/2-PW/2;bullets=[];eBullets=[];sc=0;lives=3;wave=1;fr=0;
+  sEl.textContent=0;lEl.textContent=3;run=true;go=false;
+  ov.classList.add('hidden');
+  spawnEnemies();
+}
+
+function spawnEnemies(){
+  enemies=[];eDir=1;eSpd=0.4+wave*0.15;eDown=0;eTick=0;eShootTick=0;
+  const rows=Math.min(5,3+Math.floor(wave/2));
+  const cols=Math.min(10,6+Math.floor(wave/3));
+  const ew=28,eh=20,gap=6;
+  const totalW=cols*(ew+gap)-gap;
+  const startX=(W-totalW)/2;
+  for(let r=0;r<rows;r++){
+    for(let cl=0;cl<cols;cl++){
+      enemies.push({
+        x:startX+cl*(ew+gap),y:40+r*(eh+gap+4),w:ew,h:eh,
+        type:r<1?2:r<3?1:0,alive:true
+      });
+    }
+  }
+}
+
+const ECOL=['#00f260','#feca57','#ff4757'];
+const keys={};
+document.addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();});
+document.addEventListener('keyup',e=>{keys[e.key]=false;});
+
+// Mobile controls
+let mLeft=false,mRight=false;
+function mb(id,fn){
+  const el=document.getElementById(id);
+  el.addEventListener('pointerdown',e=>{e.preventDefault();fn(true);});
+  el.addEventListener('pointerup',()=>fn(false));
+  el.addEventListener('pointerleave',()=>fn(false));
+  el.addEventListener('pointercancel',()=>fn(false));
+}
+mb('blft',v=>{mLeft=v;});
+mb('brgt',v=>{mRight=v;});
+document.getElementById('bfire').addEventListener('pointerdown',e=>{e.preventDefault();shoot();});
+
+function shoot(){
+  if(!run)return;
+  if(bullets.length<3){
+    bullets.push({x:px+PW/2-2,y:H-40,w:4,h:12});
+  }
+}
+
+function update(){
+  fr++;
+  // Player movement
+  if(keys['ArrowLeft']||keys['a']||mLeft)px-=PSPD;
+  if(keys['ArrowRight']||keys['d']||mRight)px+=PSPD;
+  px=Math.max(0,Math.min(W-PW,px));
+  if(keys[' ']&&fr%8===0)shoot();
+
+  // Bullets
+  for(let b of bullets)b.y-=7;
+  bullets=bullets.filter(b=>b.y>-20);
+
+  // Enemy bullets
+  for(let b of eBullets)b.y+=3+wave*0.3;
+  eBullets=eBullets.filter(b=>b.y<H+10);
+
+  // Move enemies
+  eTick++;
+  const stepEvery=Math.max(3,20-wave*2);
+  if(eTick%stepEvery===0){
+    let hitEdge=false;
+    for(let e of enemies){
+      if(!e.alive)continue;
+      if((eDir>0&&e.x+e.w>=W-10)||(eDir<0&&e.x<=10))hitEdge=true;
+    }
+    if(hitEdge){eDir*=-1;eDown=12;}
+    for(let e of enemies){
+      if(!e.alive)continue;
+      e.x+=eDir*eSpd*stepEvery;
+      if(eDown>0)e.y+=eDown;
+    }
+    if(eDown>0)eDown=0;
+  }
+
+  // Enemy shooting
+  eShootTick++;
+  const shootEvery=Math.max(15,50-wave*5);
+  if(eShootTick>=shootEvery){
+    eShootTick=0;
+    const alive=enemies.filter(e=>e.alive);
+    if(alive.length){
+      const shooter=alive[Math.floor(Math.random()*alive.length)];
+      eBullets.push({x:shooter.x+shooter.w/2-2,y:shooter.y+shooter.h,w:4,h:10});
+    }
+  }
+
+  // Bullet-enemy collision
+  for(let b of bullets){
+    for(let e of enemies){
+      if(!e.alive)continue;
+      if(b.x<e.x+e.w&&b.x+b.w>e.x&&b.y<e.y+e.h&&b.y+b.h>e.y){
+        e.alive=false;b.y=-100;
+        sc+=(e.type+1)*10;sEl.textContent=sc;
+      }
+    }
+  }
+
+  // Enemy bullet hits player
+  for(let b of eBullets){
+    if(b.x<px+PW&&b.x+b.w>px&&b.y<H-24&&b.y+b.h>H-24-PH){
+      b.y=H+100;lives--;lEl.textContent=lives;
+      if(lives<=0)return die();
+    }
+  }
+
+  // Enemies reach bottom
+  for(let e of enemies){
+    if(e.alive&&e.y+e.h>=H-40)return die();
+  }
+
+  // All enemies dead → next wave
+  if(enemies.every(e=>!e.alive)){
+    wave++;spawnEnemies();
+  }
+}
+
+function die(){
+  run=false;go=true;
+  if(sc>hi){hi=sc;bEl.textContent=hi;localStorage.setItem('si_hi',hi);}
+  ov.innerHTML=`<h2>💀 Game Over</h2><div class="final">${sc}</div><p class="sub">${sc>=hi&&sc>0?'🏆 New Best!':'Wave '+wave}</p><button class="btn" id="rb">↻ AGAIN</button>`;
+  ov.classList.remove('hidden');
+  document.getElementById('rb').onclick=init;
+}
+
+function draw(){
+  ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,W,H);
+
+  // Stars
+  ctx.fillStyle='rgba(255,255,255,.2)';
+  for(let i=0;i<30;i++){
+    const sx=(i*137+fr*0.1*(i%3+1))%W,sy=(i*89+fr*0.05*(i%2+1))%H;
+    ctx.fillRect(sx,sy,1.5,1.5);
+  }
+
+  // Enemies
+  for(let e of enemies){
+    if(!e.alive)continue;
+    ctx.fillStyle=ECOL[e.type];ctx.shadowColor=ECOL[e.type];ctx.shadowBlur=6;
+    // Body
+    ctx.fillRect(e.x+4,e.y,e.w-8,e.h);
+    ctx.fillRect(e.x,e.y+4,e.w,e.h-8);
+    // Eyes
+    ctx.fillStyle='#fff';
+    ctx.fillRect(e.x+6,e.y+6,4,4);
+    ctx.fillRect(e.x+e.w-10,e.y+6,4,4);
+    ctx.fillStyle='#111';
+    ctx.fillRect(e.x+7+(eDir>0?1:0),e.y+7,2,2);
+    ctx.fillRect(e.x+e.w-9+(eDir>0?1:0),e.y+7,2,2);
+    // Legs (animated)
+    ctx.fillStyle=ECOL[e.type];
+    const legOff=Math.sin(fr*0.1)*2;
+    ctx.fillRect(e.x+2,e.y+e.h-2,4,4+legOff);
+    ctx.fillRect(e.x+e.w-6,e.y+e.h-2,4,4-legOff);
+    ctx.shadowBlur=0;
+  }
+
+  // Player ship
+  ctx.fillStyle='#48dbfb';ctx.shadowColor='#48dbfb';ctx.shadowBlur=10;
+  ctx.beginPath();
+  ctx.moveTo(px+PW/2,H-40);
+  ctx.lineTo(px,H-20);
+  ctx.lineTo(px+6,H-24);
+  ctx.lineTo(px+PW-6,H-24);
+  ctx.lineTo(px+PW,H-20);
+  ctx.closePath();
+  ctx.fill();
+  // Engine glow
+  ctx.fillStyle='#ff9f43';ctx.shadowColor='#ff9f43';ctx.shadowBlur=8;
+  ctx.fillRect(px+PW/2-4,H-20,8,4+Math.sin(fr*0.5)*2);
+  ctx.shadowBlur=0;
+
+  // Player bullets
+  ctx.fillStyle='#48dbfb';ctx.shadowColor='#48dbfb';ctx.shadowBlur=6;
+  for(let b of bullets){ctx.fillRect(b.x,b.y,b.w,b.h);}
+  ctx.shadowBlur=0;
+
+  // Enemy bullets
+  ctx.fillStyle='#ff4757';ctx.shadowColor='#ff4757';ctx.shadowBlur=6;
+  for(let b of eBullets){ctx.fillRect(b.x,b.y,b.w,b.h);}
+  ctx.shadowBlur=0;
+
+  // Wave indicator
+  if(run){
+    ctx.fillStyle='rgba(255,255,255,.3)';ctx.font='bold 14px Inter,sans-serif';
+    ctx.textAlign='right';ctx.fillText('Wave '+wave,W-12,20);
+  }
+}
+
+function loop(){if(run)update();draw();requestAnimationFrame(loop);}
+draw();requestAnimationFrame(loop);
+
+document.getElementById('playBtn').onclick=init;
+
+// Touch: tap left/right side to move, middle to shoot
+c.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const r=c.getBoundingClientRect();
+  const tx=(e.touches[0].clientX-r.left)/r.width;
+  if(tx<0.33)mLeft=true;
+  else if(tx>0.66)mRight=true;
+  else shoot();
+},{passive:false});
+c.addEventListener('touchend',e=>{mLeft=false;mRight=false;},{passive:true});
+c.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const r=c.getBoundingClientRect();
+  const tx=(e.touches[0].clientX-r.left)/r.width;
+  mLeft=tx<0.33;mRight=tx>0.66;
+},{passive:false});
+</script>
+</body>
+</html>
