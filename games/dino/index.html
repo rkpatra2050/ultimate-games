@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>🦖 Dino Runner</title>
+  <link rel="stylesheet" href="../../css/game-common.css" />
+  <style>
+    #wrap{position:relative;margin:0 auto;max-width:600px;width:min(95vw,600px);aspect-ratio:3/1;touch-action:none;}
+    canvas{width:100%;height:100%;}
+    #overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(10,10,26,.85);border-radius:10px;z-index:10;transition:opacity .3s;gap:8px;padding:clamp(8px,3vw,20px);}
+    #overlay.hidden{opacity:0;pointer-events:none;}
+    #overlay h2{font-size:clamp(1.1rem,4vw,2.2rem);}
+    .final{font-size:clamp(1.5rem,6vw,3rem);font-weight:900;color:#a29bfe;text-shadow:0 0 20px rgba(162,155,254,.5);}
+    .sub{color:#888;font-size:clamp(.7rem,2.5vw,.95rem);}
+    .btn{padding:clamp(8px,3vw,14px) clamp(20px,6vw,36px);font-size:clamp(.85rem,3vw,1.1rem);font-weight:700;color:#fff;background:linear-gradient(135deg,#a29bfe,#6c5ce7);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(0.95);}
+    .hint{display:none;text-align:center;color:#666;font-size:.78rem;margin-top:8px;}
+    @media(pointer:coarse){.hint{display:block;}}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🦖 Dino Runner</h1>
+    <div class="score-board">
+      <span>Score: <strong id="score">0</strong></span>
+      <span>Best: <strong id="best">0</strong></span>
+    </div>
+  </div>
+  <div id="wrap">
+    <canvas id="c" width="600" height="200"></canvas>
+    <div id="overlay">
+      <h2>🦖 Dino Runner</h2>
+      <p class="sub">Press Space / Tap to jump!</p>
+      <button class="btn" id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+  <p class="hint">👆 Tap to jump over obstacles</p>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d'),W=600,H=200;
+const GROUND=H-30,GRAV=0.6,JUMP=-11;
+let dx=60,dy,dvy=0,onGround=true,obs=[],sc=0,spd=4,fr=0,run=false,go=false,hi=0;
+const sEl=document.getElementById('score'),bEl=document.getElementById('best'),ov=document.getElementById('overlay');
+hi=+localStorage.getItem('dn_hi')||0;bEl.textContent=hi;
+
+function init(){dx=60;dy=GROUND-30;dvy=0;onGround=true;obs=[];sc=0;spd=4;fr=0;run=true;go=false;sEl.textContent=0;ov.classList.add('hidden');}
+function jump(){if(onGround){dvy=JUMP;onGround=false;}}
+function addObs(){const h=20+Math.random()*25;const w=15+Math.random()*15;obs.push({x:W+10,y:GROUND-h,w,h,type:Math.random()>.7?'bird':'cactus'});
+if(obs[obs.length-1].type==='bird'){obs[obs.length-1].y=GROUND-40-Math.random()*30;obs[obs.length-1].w=22;obs[obs.length-1].h=16;}}
+function update(){fr++;dy+=dvy;dvy+=GRAV;if(dy>=GROUND-30){dy=GROUND-30;dvy=0;onGround=true;}
+spd=4+sc/200;if(fr%Math.max(30,80-Math.floor(sc/5))===0)addObs();
+for(let o of obs){o.x-=spd;}obs=obs.filter(o=>o.x>-30);
+for(let o of obs){if(dx+18>o.x&&dx<o.x+o.w&&dy+30>o.y&&dy<o.y+o.h)return die();}
+sc++;sEl.textContent=sc;}
+function die(){run=false;go=true;if(sc>hi){hi=sc;bEl.textContent=hi;localStorage.setItem('dn_hi',hi);}ov.innerHTML=`<h2>💀 Game Over</h2><div class="final">${sc}</div><p class="sub">${sc>=hi&&sc>0?'🏆 New Best!':'Score'}</p><button class="btn" id="rb">↻ AGAIN</button>`;ov.classList.remove('hidden');document.getElementById('rb').onclick=init;}
+function draw(){
+const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#0d1b2a');sky.addColorStop(1,'#1a1a3e');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+// ground
+ctx.fillStyle='#2a2a5a';ctx.fillRect(0,GROUND,W,30);
+ctx.strokeStyle='rgba(255,255,255,.05)';for(let i=0;i<W;i+=20){ctx.beginPath();ctx.moveTo((i-fr*spd%20+W)%W,GROUND+4);ctx.lineTo((i-fr*spd%20+W)%W+8,GROUND+4);ctx.stroke();}
+// stars
+ctx.fillStyle='rgba(255,255,255,.3)';for(let i=0;i<8;i++){const sx2=(i*83+fr*0.2)%W,sy2=20+i*12;ctx.fillRect(sx2,sy2,2,2);}
+// dino
+ctx.fillStyle='#a29bfe';ctx.shadowColor='#a29bfe';ctx.shadowBlur=8;
+// body
+ctx.fillRect(dx,dy,18,24);
+// head
+ctx.fillRect(dx+10,dy-8,14,14);
+// eye
+ctx.fillStyle='#fff';ctx.fillRect(dx+18,dy-5,3,3);ctx.fillStyle='#111';ctx.fillRect(dx+19,dy-4,2,2);
+// legs
+ctx.fillStyle='#a29bfe';const legOff=Math.sin(fr*0.3)*4;ctx.fillRect(dx+2,dy+24,5,8+legOff);ctx.fillRect(dx+11,dy+24,5,8-legOff);
+// tail
+ctx.fillRect(dx-8,dy+6,10,6);
+ctx.shadowBlur=0;
+// obstacles
+for(let o of obs){if(o.type==='cactus'){ctx.fillStyle='#2ed573';ctx.shadowColor='#2ed573';ctx.shadowBlur=4;ctx.fillRect(o.x,o.y,o.w,o.h);ctx.fillRect(o.x+o.w/2-2,o.y-6,4,6);ctx.shadowBlur=0;}else{ctx.fillStyle='#feca57';ctx.shadowColor='#feca57';ctx.shadowBlur=6;ctx.fillRect(o.x,o.y,o.w,o.h);ctx.fillStyle='#ff9f43';const wingOff=Math.sin(fr*0.4)*4;ctx.fillRect(o.x+2,o.y-6+wingOff,8,5);ctx.fillRect(o.x+12,o.y-4-wingOff,8,4);ctx.shadowBlur=0;}}
+// score on canvas
+ctx.fillStyle='rgba(255,255,255,.5)';ctx.font='bold 16px Inter,sans-serif';ctx.textAlign='right';ctx.fillText(run?sc:'',W-16,24);}
+function loop(){if(run)update();draw();requestAnimationFrame(loop);}
+dy=GROUND-30;draw();requestAnimationFrame(loop);
+document.getElementById('playBtn').onclick=init;
+document.addEventListener('keydown',e=>{if(e.key===' '||e.key==='ArrowUp'){e.preventDefault();if(run)jump();else if(go)init();}});
+c.addEventListener('touchstart',e=>{e.preventDefault();if(run)jump();else if(go)init();},{passive:false});
+c.addEventListener('click',()=>{if(run)jump();});
+</script>
+</body>
+</html>

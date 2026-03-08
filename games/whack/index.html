@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>🔨 Whack-a-Mole</title>
+  <link rel="stylesheet" href="../../css/game-common.css" />
+  <style>
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,3vw,14px);max-width:380px;width:min(88vw,380px);margin:10px auto;}
+    .hole{aspect-ratio:1;background:#1a1a3e;border:3px solid #2a2a5a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(1.6rem,7vw,3.5rem);cursor:pointer;transition:transform .1s,background .2s;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;position:relative;overflow:hidden;touch-action:manipulation;}
+    .hole::after{content:'';position:absolute;bottom:0;width:100%;height:35%;background:rgba(0,0,0,.3);border-radius:0 0 50% 50%;}
+    .hole.active{background:#2d1b00;border-color:#ee5a24;transform:scale(1.05);}
+    .hole.hit{background:#00f260;border-color:#00f260;animation:pop .3s;}
+    @keyframes pop{0%{transform:scale(1.2);}100%{transform:scale(1);}}
+    .timer{text-align:center;font-size:clamp(1.4rem,5vw,1.8rem);font-weight:800;color:#ff9f43;margin:10px 0;}
+    .btn{display:block;margin:14px auto;padding:14px 36px;font-size:1.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#ee5a24,#ff9f43);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(0.95);}
+    .msg{text-align:center;font-size:clamp(1rem,3.5vw,1.2rem);color:#00f260;min-height:30px;margin-top:8px;}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🔨 Whack-a-Mole</h1>
+    <div class="score-board">
+      <span>Score: <strong id="score">0</strong></span>
+      <span>Best: <strong id="best">0</strong></span>
+    </div>
+  </div>
+  <div class="timer" id="timer">30s</div>
+  <div class="board" id="board"></div>
+  <div class="msg" id="msg"></div>
+  <button class="btn" id="startBtn">▶ START</button>
+<script>
+const boardEl=document.getElementById('board'),sEl=document.getElementById('score'),bEl=document.getElementById('best'),timerEl=document.getElementById('timer'),msgEl=document.getElementById('msg');
+let sc,hi=+localStorage.getItem('wh_hi')||0,timeLeft,run=false,moleIdx=-1,moleTimer,gameTimer;
+bEl.textContent=hi;
+const holes=[];
+for(let i=0;i<9;i++){const d=document.createElement('div');d.className='hole';d.textContent='🕳️';d.addEventListener('click',()=>whack(i));holes.push(d);boardEl.appendChild(d);}
+function showMole(){hideMole();if(!run)return;moleIdx=Math.floor(Math.random()*9);holes[moleIdx].classList.add('active');holes[moleIdx].textContent='🐹';const delay=Math.max(400,1000-sc*15);moleTimer=setTimeout(()=>{hideMole();if(run)showMole();},delay);}
+function hideMole(){if(moleIdx>=0){holes[moleIdx].classList.remove('active','hit');holes[moleIdx].textContent='🕳️';}moleIdx=-1;}
+function whack(i){if(!run||i!==moleIdx)return;sc++;sEl.textContent=sc;holes[i].classList.remove('active');holes[i].classList.add('hit');holes[i].textContent='💥';clearTimeout(moleTimer);setTimeout(()=>{holes[i].classList.remove('hit');holes[i].textContent='🕳️';if(run)showMole();},250);}
+function tick(){timeLeft--;timerEl.textContent=timeLeft+'s';if(timeLeft<=0)endGame();}
+function endGame(){run=false;clearTimeout(moleTimer);clearInterval(gameTimer);hideMole();if(sc>hi){hi=sc;bEl.textContent=hi;localStorage.setItem('wh_hi',hi);}msgEl.textContent=sc>=hi&&sc>0?`🎉 Score: ${sc} — New Best!`:`Game Over! Score: ${sc}`;}
+function init(){clearTimeout(moleTimer);clearInterval(gameTimer);hideMole();sc=0;timeLeft=30;run=true;sEl.textContent=0;timerEl.textContent='30s';msgEl.textContent='';showMole();gameTimer=setInterval(tick,1000);}
+document.getElementById('startBtn').onclick=init;
+</script>
+</body>
+</html>

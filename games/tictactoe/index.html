@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>❌ Tic Tac Toe</title>
+  <link rel="stylesheet" href="../../css/game-common.css" />
+  <style>
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(6px,2vw,8px);max-width:320px;width:min(85vw,320px);margin:16px auto;}
+    .cell{aspect-ratio:1;background:#1a1a3e;border:2px solid #2a2a5a;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:clamp(2rem,9vw,4rem);font-weight:800;cursor:pointer;transition:background .2s,transform .15s,border-color .2s;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+    .cell:hover{background:#222255;}
+    .cell:active{transform:scale(0.93);}
+    .cell.x{color:#48dbfb;border-color:#48dbfb;text-shadow:0 0 10px rgba(72,219,251,.4);}
+    .cell.o{color:#ff4757;border-color:#ff4757;text-shadow:0 0 10px rgba(255,71,87,.4);}
+    .cell.win-cell{background:#0f3460;transform:scale(1.05);}
+    .msg{text-align:center;font-size:clamp(1rem,4vw,1.3rem);margin-top:16px;min-height:36px;color:#feca57;}
+    .btn{display:block;margin:12px auto;padding:12px 32px;font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#7bed9f,#2ed573);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(0.95);}
+    .stats{display:flex;justify-content:center;gap:clamp(12px,5vw,24px);margin-top:8px;font-size:clamp(.8rem,2.5vw,.9rem);color:#888;flex-wrap:wrap;}
+    .stats strong{color:#feca57;}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>❌ Tic Tac Toe</h1>
+  </div>
+  <div class="stats">
+    <span>You (X): <strong id="pw">0</strong></span>
+    <span>CPU (O): <strong id="cw">0</strong></span>
+    <span>Draw: <strong id="dw">0</strong></span>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="msg" id="msg">Your turn! (X)</div>
+  <button class="btn" id="restart">↻ New Game</button>
+<script>
+const boardEl=document.getElementById('board'),msgEl=document.getElementById('msg');
+const pwEl=document.getElementById('pw'),cwEl=document.getElementById('cw'),dwEl=document.getElementById('dw');
+let grid,turn,over,pw=0,cw=0,dw=0;
+const WINS=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const cells=[];
+function init(){grid=Array(9).fill('');turn='X';over=false;msgEl.textContent='Your turn! (X)';boardEl.innerHTML='';cells.length=0;
+for(let i=0;i<9;i++){const d=document.createElement('div');d.className='cell';d.addEventListener('click',()=>play(i));cells.push(d);boardEl.appendChild(d);}}
+function play(i){if(over||grid[i]||turn!=='X')return;grid[i]='X';cells[i].textContent='X';cells[i].classList.add('x');const w=checkWin('X');if(w)return finish('X',w);if(grid.every(v=>v))return finish('draw');turn='O';msgEl.textContent='CPU thinking...';setTimeout(cpuMove,400);}
+function cpuMove(){if(over)return;
+// Try to win
+for(let i=0;i<9;i++){if(!grid[i]){grid[i]='O';if(checkWin('O')){cells[i].textContent='O';cells[i].classList.add('o');return finish('O',checkWin('O'));}grid[i]='';}}
+// Try to block
+for(let i=0;i<9;i++){if(!grid[i]){grid[i]='X';if(checkWin('X')){grid[i]='O';cells[i].textContent='O';cells[i].classList.add('o');turn='X';msgEl.textContent='Your turn! (X)';if(grid.every(v=>v))return finish('draw');return;}grid[i]='';}}
+// Center
+if(!grid[4]){grid[4]='O';cells[4].textContent='O';cells[4].classList.add('o');turn='X';msgEl.textContent='Your turn! (X)';if(grid.every(v=>v))return finish('draw');return;}
+// Corners
+const corners=[0,2,6,8].filter(i=>!grid[i]);if(corners.length){const pick=corners[Math.floor(Math.random()*corners.length)];grid[pick]='O';cells[pick].textContent='O';cells[pick].classList.add('o');turn='X';msgEl.textContent='Your turn! (X)';if(grid.every(v=>v))return finish('draw');return;}
+// Random
+const avail=grid.map((v,i)=>v?-1:i).filter(i=>i>=0);if(!avail.length)return finish('draw');const pick=avail[Math.floor(Math.random()*avail.length)];grid[pick]='O';cells[pick].textContent='O';cells[pick].classList.add('o');turn='X';msgEl.textContent='Your turn! (X)';if(grid.every(v=>v))return finish('draw');}
+function checkWin(p){for(let w of WINS)if(w.every(i=>grid[i]===p))return w;return null;}
+function finish(result,winCells){over=true;if(result==='draw'){dw++;dwEl.textContent=dw;msgEl.textContent="🤝 It's a Draw!";}else if(result==='X'){pw++;pwEl.textContent=pw;msgEl.textContent='🎉 You Win!';winCells.forEach(i=>cells[i].classList.add('win-cell'));}else{cw++;cwEl.textContent=cw;msgEl.textContent='😢 CPU Wins!';winCells.forEach(i=>cells[i].classList.add('win-cell'));}}
+document.getElementById('restart').onclick=init;
+init();
+</script>
+</body>
+</html>

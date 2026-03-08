@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>🏓 Pong</title>
+  <link rel="stylesheet" href="../../css/game-common.css" />
+  <style>
+    #wrap{position:relative;margin:0 auto;max-width:500px;width:min(92vw,500px);aspect-ratio:5/3;}
+    canvas{width:100%;height:100%;touch-action:none;}
+    #overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(10,10,26,.88);border-radius:10px;z-index:10;transition:opacity .3s;gap:12px;padding:20px;}
+    #overlay.hidden{opacity:0;pointer-events:none;}
+    #overlay h2{font-size:clamp(1.5rem,5vw,2.2rem);}
+    .sub{color:#888;font-size:.95rem;}
+    .btn{padding:14px 36px;font-size:1.1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#feca57,#ff9f43);border:none;border-radius:50px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn:active{transform:scale(0.95);}
+    .vs{display:flex;gap:clamp(20px,8vw,40px);font-size:clamp(1.8rem,6vw,2.5rem);font-weight:900;}
+    .vs span:first-child{color:#48dbfb;} .vs span:last-child{color:#ff4757;}
+    .hint{display:none;text-align:center;color:#666;font-size:.78rem;margin-top:8px;}
+    @media(pointer:coarse){.hint{display:block;}}
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="back-btn">← Back</a>
+  <div class="game-header">
+    <h1>🏓 Pong</h1>
+    <div class="score-board">
+      <span style="color:#48dbfb">You: <strong id="ps">0</strong></span>
+      <span style="color:#ff4757">CPU: <strong id="cs">0</strong></span>
+    </div>
+  </div>
+  <div id="wrap">
+    <canvas id="c" width="500" height="300"></canvas>
+    <div id="overlay">
+      <h2>🏓 Pong</h2>
+      <p class="sub">First to 5 wins! Move with mouse/touch.</p>
+      <button class="btn" id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+  <p class="hint">👆 Slide your finger on the canvas to move the paddle</p>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d'),W=500,H=300;
+const PW=10,PH=60,BR=6,SPD=4;
+let py1=H/2-PH/2,py2=H/2-PH/2,bx=W/2,by=H/2,bvx=0,bvy=0,ps=0,cs=0,run=false,aiSpd;
+const psEl=document.getElementById('ps'),csEl=document.getElementById('cs'),ov=document.getElementById('overlay');
+function init(){py1=H/2-PH/2;py2=H/2-PH/2;resetBall();ps=0;cs=0;psEl.textContent=0;csEl.textContent=0;run=true;aiSpd=2.8;ov.classList.add('hidden');}
+function resetBall(){bx=W/2;by=H/2;const a=(Math.random()-.5)*Math.PI/3;const d=Math.random()>.5?1:-1;bvx=SPD*d*Math.cos(a);bvy=SPD*Math.sin(a);}
+function update(){if(!run)return;bx+=bvx;by+=bvy;if(by-BR<0||by+BR>H){bvy=-bvy;by=by-BR<0?BR:H-BR;}
+if(bx-BR<=20&&by>=py1&&by<=py1+PH){bvx=Math.abs(bvx)*1.05;bvy+=(by-(py1+PH/2))*0.1;}
+if(bx+BR>=W-20&&by>=py2&&by<=py2+PH){bvx=-Math.abs(bvx)*1.05;bvy+=(by-(py2+PH/2))*0.1;}
+if(bx<0){cs++;csEl.textContent=cs;if(cs>=5)return win(false);resetBall();}
+if(bx>W){ps++;psEl.textContent=ps;if(ps>=5)return win(true);resetBall();}
+const ct=py2+PH/2;if(ct<by-5)py2+=aiSpd;else if(ct>by+5)py2-=aiSpd;py2=Math.max(0,Math.min(H-PH,py2));}
+function win(player){run=false;ov.innerHTML=`<h2>${player?'🎉 You Win!':'😢 CPU Wins'}</h2><div class="vs"><span>${ps}</span><span>${cs}</span></div><button class="btn" id="rb">↻ AGAIN</button>`;ov.classList.remove('hidden');document.getElementById('rb').onclick=()=>{init();};}
+function draw(){ctx.fillStyle='#0d1b2a';ctx.fillRect(0,0,W,H);ctx.setLineDash([6,6]);ctx.strokeStyle='rgba(255,255,255,.1)';ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([]);
+ctx.shadowColor='#48dbfb';ctx.shadowBlur=10;ctx.fillStyle='#48dbfb';ctx.fillRect(10,py1,PW,PH);ctx.shadowColor='#ff4757';ctx.fillStyle='#ff4757';ctx.fillRect(W-20,py2,PW,PH);ctx.shadowBlur=0;
+ctx.shadowColor='#feca57';ctx.shadowBlur=12;ctx.fillStyle='#feca57';ctx.beginPath();ctx.arc(bx,by,BR,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
+function loop(){update();draw();requestAnimationFrame(loop);}
+draw();requestAnimationFrame(loop);
+document.getElementById('playBtn').onclick=init;
+function setPlayerY(clientY){const r=c.getBoundingClientRect();const y=(clientY-r.top)/r.height*H-PH/2;py1=Math.max(0,Math.min(H-PH,y));}
+c.addEventListener('mousemove',e=>setPlayerY(e.clientY));
+c.addEventListener('touchmove',e=>{e.preventDefault();setPlayerY(e.touches[0].clientY);},{passive:false});
+c.addEventListener('touchstart',e=>{if(!run)init();setPlayerY(e.touches[0].clientY);},{passive:true});
+</script>
+</body>
+</html>
